@@ -1,3 +1,9 @@
+// these are the hex values for the codes
+// if you want to change the hue or whatever of the red for example
+// just change the red to some other hex code
+// search google for a hex color calculator or something like that
+// you'll be able to find a hex code for w.e color you want
+// there's literally millions of choices lol
 const COLORS = {
   'darkGray':'#7c7c7c',
   'gray':'#d7d7d7',
