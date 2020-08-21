@@ -10,11 +10,17 @@ const COLORS = {
 
 
 function onOpen() {
+  // this runs when the script is opened
+  // it creates the Scripts menu option
+  // for the user to run the script
   let ui = SpreadsheetApp.getUi();
   ui.createMenu('Scripts').addItem('Process Sheet','startSheet').addToUi();
 }
 
 function justToSaveStuff() {
+  // this function solely exists so that my code editor
+  // recognizes "Browser.msgBox" as a function
+  // can delete this it doesn't matter at all
   Browser.msgBox('test');
 }
 
@@ -25,6 +31,9 @@ function startSheet() {
   let timeInfo = {};
   let ss = SpreadsheetApp.getActiveSpreadsheet();
   ss.renameActiveSheet('Raw Data');
+
+  // loops through the dictionary-like object
+  // and creates an individual sheet for every canv
   for (const name in dict) {
     ss.insertSheet(name);
     let timeArr = populateIndividual(name, dict[name]);
@@ -33,16 +42,6 @@ function startSheet() {
     timeInfo[name]['startTime'] = timeArr[1];
     timeInfo[name]['endTime'] = timeArr[2];
   }
-  
-  
-  // timeInfo['PoderFLVRP18'] = {};
-
-  // ss.insertSheet('PoderFLVRP18');
-  // let timeArr = populateIndividual('PoderFLVRP18', dict['PoderFLVRP18']);
-  // timeInfo['PoderFLVRP18']['timeDiffs'] = timeArr[0];
-  // timeInfo['PoderFLVRP18']['startTime'] = timeArr[1];
-  // timeInfo['PoderFLVRP18']['endTime'] = timeArr[2];
-  
   populateGroup(dict, timeInfo);
 }
 
@@ -59,16 +58,6 @@ function sortDictByTime(dict) {
   return dict;
 }
 
-
-function countObj(obj) {
-  let c = 0;
-  for (const thing in obj) {
-    c++;
-  }
-  return c;
-}
-
-
 function populateGroup(dict, timeInfo) {
   // creates the overview page and populates it with data
   let ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -80,6 +69,9 @@ function populateGroup(dict, timeInfo) {
   const LETTERS = ['NULL','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
   
   function getUniqueResults() {
+    // finds all the unique result options
+    // and creates a template, which is used 
+    // for the rest of the process
     let template = {};
     for (const name in dict) {
       let data = dict[name];
@@ -92,7 +84,9 @@ function populateGroup(dict, timeInfo) {
   }
   
   let template = getUniqueResults();
-  
+
+
+  // this part creates the header cells
   let topRow = ['Caller ID','Total Calls']
   for (const result in template) {
     topRow.push(result);
@@ -111,17 +105,16 @@ function populateGroup(dict, timeInfo) {
     // counts up totals from results
     let templateCopy = { ...template };
     let data = dict[name];
-    
     function loop(val, ind, arr) {
       let result = val[4];
       templateCopy[result]++;
     }
-
     data.forEach(loop);
-
     return templateCopy;
   }
 
+  // creates the meat of the page
+  // tallies things up and writes it to the sheet
   let groupRows = []
   let c = 0;
   for (const name in dict) {
@@ -149,6 +142,11 @@ function populateGroup(dict, timeInfo) {
   }
 
   function addSumTotals() {
+    // adds averages / totals to the bottom
+    // and styles it appropriately
+    // this part uses Sheets formulas because
+    // I felt it would have been messier
+    // to do it myself
     let row = groupRows.length+1;
     let toWrite = [['Averages'],['Totals']];
 
@@ -159,11 +157,8 @@ function populateGroup(dict, timeInfo) {
     for (const result in template) {
       toWrite[0].push(`=AVERAGE(${LETTERS[col]}2:${LETTERS[col]}${row})`);
       toWrite[1].push(`=SUM(${LETTERS[col]}2:${LETTERS[col]}${row})`);
-
       toWrite[0].push(`=AVERAGE(${LETTERS[col+1]}2:${LETTERS[col+1]}${row})`);
-      // toWrite[1].push(`=SUM(${LETTERS[col+1]}2:${LETTERS[col+1]}${row})`);
       toWrite[1].push('');
-
       col += 2;
     }
 
@@ -178,24 +173,28 @@ function populateGroup(dict, timeInfo) {
   }
 
   function resizeColsRows() {
+    // like the name says...
+    // it resizes columns and rows
+    // the values to the RIGHT of the functions
+    // ie. setColumnWidth(i, HERE)
+    // are changable, and that's the actual weight
+    // 1 = A, 2 = B, ... etc
     sheet.setColumnWidth(1, 143);
-
     let i;
     for(i=2; i<topRow.length+1; i++) {
       sheet.setColumnWidth(i, 73);
     }
-
     sheet.setRowHeight(1, 57);
   }
 
   resizeColsRows();
 
   function formatStatic() {
+    // formats the parts of the page that aren't dynamic
     let topRowRange = sheet.getRange(`A1:${LETTERS[topRow.length]}1`);
     let topRowRange2 = sheet.getRange(`B1:${LETTERS[topRow.length]}1`);
     topRowRange.setFontWeight('bold');
     topRowRange.setHorizontalAlignment('center');
-    // topRowRange.setVerticalAlignment('middle');
     topRowRange.setWrap(true);
 
     topRowRange2.setBackground(COLORS['darkGray']);
@@ -208,9 +207,9 @@ function populateGroup(dict, timeInfo) {
   formatStatic();
 
   function addBorders() {
+    // adds borders to the necessary cell ranges
     let leftRange = sheet.getRange(`A2:A${groupRows.length+3}`);
     leftRange.setBorder(null, null, null, true, false, false);
-
     let nextRange = sheet.getRange(`B2:B${groupRows.length+3}`);
     nextRange.setBorder(null, null, null, true, false, false);
 
@@ -221,19 +220,22 @@ function populateGroup(dict, timeInfo) {
       range.setBorder(null, null, null, true, false, false);
       col += 2;
     }
-
   }
-
   addBorders();
 
   function addStartEndTimes() {
+    // adds the time info to the right of the avg stats
     let toWrite = [];
 
     function countTimeDiffs(name) {
+      // counts the time diffs based on THRESHOLD value
+      // to make it so there's a different threshold (10 mins instead of 5, for example)
+      // just change THRESHOLD to whatever
+      //               vvvv
       const THRESHOLD = 5;
       let rawData = timeInfo[name]['timeDiffs'];
       let count = 0;
-      
+
       function loop(val, ind, arr) {
         let num = Number(String(val).split(" ")[0]);
         if(num >= THRESHOLD) {
@@ -241,7 +243,6 @@ function populateGroup(dict, timeInfo) {
         }
       }
       rawData.forEach(loop);
-
       return count;
     }
 
@@ -270,17 +271,17 @@ function populateGroup(dict, timeInfo) {
 
     let rightRange = sheet.getRange(`${LETTERS[col+2]}2:${LETTERS[col+2]}${groupRows.length+1}`);
     rightRange.setBorder(null, null, null, true, false, false);
-
     let bottomRange = sheet.getRange(`${LETTERS[col-1]}${groupRows.length+1}:${LETTERS[col+2]}${groupRows.length+1}`);
     bottomRange.setBorder(null, null, true, null, false, false);
 
     range.setValues(toWrite);
-
   }
 
   addStartEndTimes();
 
   function addAlternatingColors() {
+    // makes it look prettier by making every other row
+    // light gray
     let startRow = 2;
     let endRow = groupRows.length+1;
 
@@ -306,14 +307,8 @@ function populateGroup(dict, timeInfo) {
 
     let range = sheet.getRange(`${LETTERS[startCol]}${startRow}:${LETTERS[endCol]}${endRow}`);
     range.setBackgrounds(colorList);
-
-
   }
-
   addAlternatingColors();
-
-  // Browser.msgBox(groupRows);
-
 }
 
 function populateIndividual(callerID, data) {
@@ -359,7 +354,6 @@ function populateIndividual(callerID, data) {
       let range = sheet.getRange('F2');
       return [[0],range.getValues(),range.getValues()];
     }
-
     let timeRange = sheet.getRange(`F2:F${data.length+1}`);
     let vals = timeRange.getValues();
 
@@ -376,8 +370,7 @@ function populateIndividual(callerID, data) {
         avg += timeDiff/60000;
         timeDiffs.push([`${timeDiff/60000} mins`]);
       }
-    }
-    
+    }    
     vals.forEach(loop);
 
     let diffRange = sheet.getRange(`G2:G${timeDiffs.length+1}`);
@@ -396,10 +389,10 @@ function populateIndividual(callerID, data) {
 
     return [timeDiffs, startTime, endTime];
   }
-
   timeArr = addTimeDiffs();
 
   function formatStatic() {
+    // formats some of the things that won't change
     sheet.setColumnWidth(1, 77);
     sheet.setColumnWidth(2, 131);
     sheet.setColumnWidth(3, 93);
@@ -421,6 +414,8 @@ function populateIndividual(callerID, data) {
   formatStatic();
 
   function colorTimeDiffs() {
+    // this adds borders to the rightmost column
+    // as well as color codes the time diffs column
     let range = sheet.getRange(`G2:G${numRows+1}`);
     let vals = range.getValues();
 
@@ -428,14 +423,24 @@ function populateIndividual(callerID, data) {
     weights = [];
 
     c = 2;
+    // if you want to change the color scheme
+    // just change the numbers 25, 0, 2
+    // right now, if it's bigger than 25, it gets red
+    // if it's less than 25 but bigger than 2, it gets orange
+    // if it's 0 it gets yellow
+    // the rest, no change
+    // you can freely edit those values
     function loop(val, ind, arr) {
       let num = Number(String(val).split(" ")[0]);
+      // here vvvv
       if(num >= 25) {
         colors.push(['red']);
         weights.push(['bold']);
-      } else if(num ==0) {
+      //       here vvvv
+      } else if(num == 0) {
         colors.push(['yellow']);
         weights.push(['bold']);
+      //        here vvvv 
       } else if(num > 2) {
         colors.push(['orange']);
         weights.push(['bold']);
@@ -451,31 +456,18 @@ function populateIndividual(callerID, data) {
       c++;
     }
     vals.forEach(loop);
-
     range.setBackgrounds(colors);
     range.setFontWeights(weights);
     range.setBorder(null, null, null, true, false, false);
-
   }
 
   colorTimeDiffs();
-
   return timeArr;
-
-
-  // should return time diffs here so that we can do stuff with it in the other function
-  // not sure if should do here or in the other function
-  // but something like
-  // personA time diffs = {
-  // >5 mins: xyz,
-  // >10 mins: abc,
-  // 25+ mins: fidof,
-  // };
-  // obv with one being subtracted for lunch break
-
 }
 
 function getRangeVals() {
+  // helper function to help get the actual
+  // text data from a range of cells
   let ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getActiveSheet();
   let rangeData = sheet.getDataRange();
