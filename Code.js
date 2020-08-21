@@ -1,3 +1,14 @@
+const COLORS = {
+  'darkGray':'#7c7c7c',
+  'gray':'#d7d7d7',
+  'red':'#ff2525',
+  'lightRed':'#f58080',
+  'orange':'#ffc622',
+  'yellow':'#fdf322',
+  'green':'#08bd0e',
+};
+
+
 function onOpen() {
   let ui = SpreadsheetApp.getUi();
   ui.createMenu('Scripts').addItem('Process Sheet','startSheet').addToUi();
@@ -11,19 +22,28 @@ function startSheet() {
   // entry point into the script
   let dict = compileRows();
 
-  let namesList = [];
+  let timeInfo = {};
   let ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.rename('Raw Data');
+  ss.renameActiveSheet('Raw Data');
   for (const name in dict) {
     ss.insertSheet(name);
-    populateIndividual(name, dict[name]);
+    let timeArr = populateIndividual(name, dict[name]);
+    timeInfo[name] = {}
+    timeInfo[name]['timeDiffs'] = timeArr[0];
+    timeInfo[name]['startTime'] = timeArr[1];
+    timeInfo[name]['endTime'] = timeArr[2];
   }
   
-  populateGroup(dict);
   
-  // tmp = ['PoderFLVRP7']
-  // createNewSheets(tmp);
-  // populateIndividual('PoderFLVRP7',dict['PoderFLVRP7']);
+  // timeInfo['PoderFLVRP18'] = {};
+
+  // ss.insertSheet('PoderFLVRP18');
+  // let timeArr = populateIndividual('PoderFLVRP18', dict['PoderFLVRP18']);
+  // timeInfo['PoderFLVRP18']['timeDiffs'] = timeArr[0];
+  // timeInfo['PoderFLVRP18']['startTime'] = timeArr[1];
+  // timeInfo['PoderFLVRP18']['endTime'] = timeArr[2];
+  
+  populateGroup(dict, timeInfo);
 }
 
 function sortDictByTime(dict) {
@@ -39,15 +59,6 @@ function sortDictByTime(dict) {
   return dict;
 }
 
-function createNewSheets(namesList) {
-  // takes in a list of caller ids
-  // and creates new sheets for each of them
-  let ss = SpreadsheetApp.getActiveSpreadsheet();
-  function createNewSheet(val, ind, arr) {
-    ss.insertSheet(val);
-  }
-  namesList.forEach(createNewSheet);
-}
 
 function countObj(obj) {
   let c = 0;
@@ -57,12 +68,14 @@ function countObj(obj) {
   return c;
 }
 
-function populateGroup(dict) {
+
+function populateGroup(dict, timeInfo) {
   // creates the overview page and populates it with data
   let ss = SpreadsheetApp.getActiveSpreadsheet();
   ss.insertSheet('Overview');
   let sheet = SpreadsheetApp.getActive().getSheetByName('Overview');
   ss.moveActiveSheet(1);
+  sheet.setHiddenGridlines(true);
   
   const LETTERS = ['NULL','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
   
@@ -83,9 +96,16 @@ function populateGroup(dict) {
   let topRow = ['Caller ID','Total Calls']
   for (const result in template) {
     topRow.push(result);
+    topRow.push(`${result.slice(0,4)} Avg`);
   }
+  topRow.push('Start Time');
+  topRow.push('End Time');
+  topRow.push('Hours Worked');
+  topRow.push('5+ Time Diffs');
   let topRowRange = sheet.getRange(`A1:${LETTERS[topRow.length]}1`);
+  let topRowRange2 = sheet.getRange(`B1:${LETTERS[topRow.length]}1`);
   topRowRange.setValues([topRow]);
+  topRowRange2.setFontSize(11);
 
   function getIndividualTemplate(name) {
     // counts up totals from results
@@ -103,11 +123,13 @@ function populateGroup(dict) {
   }
 
   let groupRows = []
+  let c = 0;
   for (const name in dict) {
     let individualResults = getIndividualTemplate(name);
     let row = [name, dict[name].length];
     for (const result in individualResults) {
       row.push(individualResults[result]);
+      row.push(individualResults[result]/dict[name].length);
     }
     groupRows.push(row);
   }
@@ -116,6 +138,179 @@ function populateGroup(dict) {
   let endCol = LETTERS[groupRows[0].length]
   let overviewRange = sheet.getRange(`A2:${endCol}${groupRows.length+1}`);
   overviewRange.setValues(groupRows);
+
+  addSumTotals();
+  let currentCol = 4;
+  for (const result in template) {
+    let range = sheet.getRange(`${LETTERS[currentCol]}2:${LETTERS[currentCol]}${groupRows.length+2}`);
+    range.setNumberFormat('00.0%');
+    range.setFontSize(11);
+    currentCol += 2;
+  }
+
+  function addSumTotals() {
+    let row = groupRows.length+1;
+    let toWrite = [['Averages'],['Totals']];
+
+    toWrite[0].push(`=AVERAGE(B2:B${row})`);
+    toWrite[1].push(`=SUM(B2:B${row})`);
+
+    let col = 3;
+    for (const result in template) {
+      toWrite[0].push(`=AVERAGE(${LETTERS[col]}2:${LETTERS[col]}${row})`);
+      toWrite[1].push(`=SUM(${LETTERS[col]}2:${LETTERS[col]}${row})`);
+
+      toWrite[0].push(`=AVERAGE(${LETTERS[col+1]}2:${LETTERS[col+1]}${row})`);
+      // toWrite[1].push(`=SUM(${LETTERS[col+1]}2:${LETTERS[col+1]}${row})`);
+      toWrite[1].push('');
+
+      col += 2;
+    }
+
+    let range = sheet.getRange(`A${row+1}:${LETTERS[col-1]}${row+2}`);
+    let range2 = sheet.getRange(`B${row+1}:${LETTERS[col-1]}${row+2}`);
+    range.setValues(toWrite);
+    range.setNumberFormat('####');
+    range.setFontWeight('bold');
+    range.setFontSize(11);
+
+    range2.setBackground(COLORS['darkGray']);
+  }
+
+  function resizeColsRows() {
+    sheet.setColumnWidth(1, 143);
+
+    let i;
+    for(i=2; i<topRow.length+1; i++) {
+      sheet.setColumnWidth(i, 73);
+    }
+
+    sheet.setRowHeight(1, 57);
+  }
+
+  resizeColsRows();
+
+  function formatStatic() {
+    let topRowRange = sheet.getRange(`A1:${LETTERS[topRow.length]}1`);
+    let topRowRange2 = sheet.getRange(`B1:${LETTERS[topRow.length]}1`);
+    topRowRange.setFontWeight('bold');
+    topRowRange.setHorizontalAlignment('center');
+    // topRowRange.setVerticalAlignment('middle');
+    topRowRange.setWrap(true);
+
+    topRowRange2.setBackground(COLORS['darkGray']);
+
+    let leftColRange = sheet.getRange(`A1:A${groupRows.length+3}`);
+    leftColRange.setFontWeight('bold');
+    leftColRange.setHorizontalAlignment('right');
+  }
+
+  formatStatic();
+
+  function addBorders() {
+    let leftRange = sheet.getRange(`A2:A${groupRows.length+3}`);
+    leftRange.setBorder(null, null, null, true, false, false);
+
+    let nextRange = sheet.getRange(`B2:B${groupRows.length+3}`);
+    nextRange.setBorder(null, null, null, true, false, false);
+
+    let col = 4;
+    for (const result in template) {
+      let lett = LETTERS[col];
+      let range = sheet.getRange(`${lett}2:${lett}${groupRows.length+3}`);
+      range.setBorder(null, null, null, true, false, false);
+      col += 2;
+    }
+
+  }
+
+  addBorders();
+
+  function addStartEndTimes() {
+    let toWrite = [];
+
+    function countTimeDiffs(name) {
+      const THRESHOLD = 5;
+      let rawData = timeInfo[name]['timeDiffs'];
+      let count = 0;
+      
+      function loop(val, ind, arr) {
+        let num = Number(String(val).split(" ")[0]);
+        if(num >= THRESHOLD) {
+          count++;
+        }
+      }
+      rawData.forEach(loop);
+
+      return count;
+    }
+
+    for (const name in dict) {
+      let startTime = timeInfo[name]['startTime'];
+      let endTime = timeInfo[name]['endTime'];
+      let hoursWorked = new Date('1970/01/01 ' + endTime) - new Date ('1970/01/01 ' + startTime);
+      hoursWorked = Math.round(hoursWorked/3600000 * 10) / 10;
+      let timeDiffCount = countTimeDiffs(name);
+
+      let row = [startTime, endTime, hoursWorked, timeDiffCount];
+      toWrite.push(row);
+
+
+    }
+
+    let col = 4;
+    for (const result in template) {
+      col += 2;
+    }
+    let range = sheet.getRange(`${LETTERS[col-1]}2:${LETTERS[col+2]}${groupRows.length+1}`);
+    sheet.setColumnWidth(col-1, 92);
+    sheet.setColumnWidth(col, 92);
+    sheet.setColumnWidth(col+1, 61);
+    sheet.setColumnWidth(col+2, 61);
+
+    let rightRange = sheet.getRange(`${LETTERS[col+2]}2:${LETTERS[col+2]}${groupRows.length+1}`);
+    rightRange.setBorder(null, null, null, true, false, false);
+
+    let bottomRange = sheet.getRange(`${LETTERS[col-1]}${groupRows.length+1}:${LETTERS[col+2]}${groupRows.length+1}`);
+    bottomRange.setBorder(null, null, true, null, false, false);
+
+    range.setValues(toWrite);
+
+  }
+
+  addStartEndTimes();
+
+  function addAlternatingColors() {
+    let startRow = 2;
+    let endRow = groupRows.length+1;
+
+    let startCol = 2;
+    let endCol = 6;
+    for (const result in template) {
+      endCol += 2;
+    }
+
+    let colorList = [];
+    let i, j;
+    for(i=startRow; i<endRow+1; i++) {
+      row = [];
+      for(j=startCol; j<endCol+1; j++) {
+        if(i%2 == 0) {
+          row.push('white');
+        } else {
+          row.push(COLORS['gray']);
+        }
+      }
+      colorList.push(row);
+    }
+
+    let range = sheet.getRange(`${LETTERS[startCol]}${startRow}:${LETTERS[endCol]}${endRow}`);
+    range.setBackgrounds(colorList);
+
+
+  }
+
+  addAlternatingColors();
 
   // Browser.msgBox(groupRows);
 
@@ -135,6 +330,25 @@ function populateIndividual(callerID, data) {
   let range = sheet.getRange(`A2:F${numRows+1}`);
   range.setValues(data);
 
+  let rangePlusTimeDiffs = sheet.getRange(`A2:G${numRows+1}`);
+
+  let i, j;
+  let colorList = [];
+  for(i=2; i<numRows+2; i++) {
+    let row = [];
+    for(j=1; j<8; j++) {
+      if(i%2 == 0) {
+        row.push('white');
+      } else {
+        row.push(COLORS['gray']);
+      }
+    }
+    colorList.push(row);
+  }
+
+  rangePlusTimeDiffs.setBackgrounds(colorList);
+
+
   function addTimeDiffs() {
     // adds the time diffs next to the 'call time' column
     // returns an array [ startTime, endTime ]
@@ -142,13 +356,15 @@ function populateIndividual(callerID, data) {
 
     if(data.length == 1) {
       // if there is only one time, no use in time diffs
-      return;
+      let range = sheet.getRange('F2');
+      return [[0],range.getValues(),range.getValues()];
     }
 
     let timeRange = sheet.getRange(`F2:F${data.length+1}`);
     let vals = timeRange.getValues();
 
     let timeDiffs = [];
+    let avg = 0;
 
     function loop(cur, ind, arr) {
       if(ind == arr.length-1) {
@@ -157,6 +373,7 @@ function populateIndividual(callerID, data) {
         let next = new Date ('1970/01/01 ' + arr[ind+1]);
         cur = new Date('1970/01/01 ' + cur);
         let timeDiff = next - cur;
+        avg += timeDiff/60000;
         timeDiffs.push([`${timeDiff/60000} mins`]);
       }
     }
@@ -168,10 +385,94 @@ function populateIndividual(callerID, data) {
 
     let startTime = vals[0];
     let endTime = vals[vals.length-1];
-    return [startTime, endTime];
+
+    avg = Math.round((avg/timeDiffs.length+1)*100)/100;
+    let avgRange = sheet.getRange(`H2:I2`);
+    let writeTo = ['Avg Time Diff', `${avg} mins`]
+    let weights = ['bold','normal'];
+
+    avgRange.setValues([writeTo]);
+    avgRange.setFontWeights([weights]);
+
+    return [timeDiffs, startTime, endTime];
   }
 
-  startEndTimes = addTimeDiffs();
+  timeArr = addTimeDiffs();
+
+  function formatStatic() {
+    sheet.setColumnWidth(1, 77);
+    sheet.setColumnWidth(2, 131);
+    sheet.setColumnWidth(3, 93);
+    sheet.setColumnWidth(4, 65);
+    sheet.setColumnWidth(5, 150);
+    sheet.setColumnWidth(6, 92);
+    sheet.setColumnWidth(7, 64);
+
+    let topRow = sheet.getRange(`A1:G1`);
+    topRow.setFontWeight('bold');
+    topRow.setBackground(COLORS['darkGray']);
+    sheet.setHiddenGridlines(true)
+
+    let bottomRow = sheet.getRange(`A${numRows+1}:G${numRows+1}`);
+    bottomRow.setBorder(null, null, true, null, false, false);
+
+  }
+
+  formatStatic();
+
+  function colorTimeDiffs() {
+    let range = sheet.getRange(`G2:G${numRows+1}`);
+    let vals = range.getValues();
+
+    colors = [];
+    weights = [];
+
+    c = 2;
+    function loop(val, ind, arr) {
+      let num = Number(String(val).split(" ")[0]);
+      if(num >= 25) {
+        colors.push(['red']);
+        weights.push(['bold']);
+      } else if(num ==0) {
+        colors.push(['yellow']);
+        weights.push(['bold']);
+      } else if(num > 2) {
+        colors.push(['orange']);
+        weights.push(['bold']);
+      } else {
+        if(c%2 == 0) {
+          colors.push(['white']);
+          weights.push(['normal']);
+        } else {
+          colors.push([COLORS['gray']]);
+          weights.push(['normal']);
+        }
+      }
+      c++;
+    }
+    vals.forEach(loop);
+
+    range.setBackgrounds(colors);
+    range.setFontWeights(weights);
+    range.setBorder(null, null, null, true, false, false);
+
+  }
+
+  colorTimeDiffs();
+
+  return timeArr;
+
+
+  // should return time diffs here so that we can do stuff with it in the other function
+  // not sure if should do here or in the other function
+  // but something like
+  // personA time diffs = {
+  // >5 mins: xyz,
+  // >10 mins: abc,
+  // 25+ mins: fidof,
+  // };
+  // obv with one being subtracted for lunch break
+
 }
 
 function getRangeVals() {
@@ -201,7 +502,8 @@ function compileRows() {
   function loop(val, ind, arr) {
     let voterID = val[0];
     let fullName = `${val[2]} ${val[3]}`;
-    let phone = val[4];
+    let phone = String(val[4]);
+    phone = `(${phone.slice(0,3)}) ${phone.slice(3,6)}-${phone.slice(6,10)}`;
     let date = val[5];
     let time = val[6];
     let callerID = val[7];
@@ -220,6 +522,5 @@ function compileRows() {
   rawData.forEach(loop);
 
   dict = sortDictByTime(dict);
-
   return dict;
 }
