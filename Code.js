@@ -14,13 +14,16 @@ const COLORS = {
   'green':'#08bd0e',
 };
 
+function startText() {
+  Browser.msgBox('testing 123');
+}
 
 function onOpen() {
   // this runs when the script is opened
   // it creates the Scripts menu option
   // for the user to run the script
   let ui = SpreadsheetApp.getUi();
-  ui.createMenu('Scripts').addItem('Process Sheet','startSheet').addToUi();
+  ui.createMenu('Scripts').addItem('ThruTalk Visuals','startSheet').addItem('ThruText Visuals', 'startText').addToUi();
 }
 
 function justToSaveStuff() {
