@@ -1,9 +1,3 @@
-// these are the hex values for the codes
-// if you want to change the hue or whatever of the red for example
-// just change the red to some other hex code
-// search google for a hex color calculator or something like that
-// you'll be able to find a hex code for w.e color you want
-// there's literally millions of choices lol
 const COLORS = {
   'darkGray':'#7c7c7c',
   'gray':'#d7d7d7',
@@ -15,9 +9,6 @@ const COLORS = {
 };
 
 function onOpen() {
-  // this runs when the script is opened
-  // it creates the Scripts menu option
-  // for the user to run the script
   let ui = SpreadsheetApp.getUi();
   ui.createMenu('Scripts').addItem('Call results','startSheet')
   .addItem('Callers Details', 'startCallerDetails')
@@ -151,9 +142,6 @@ function populateGroup(dict, timeInfo) {
   function addSumTotals() {
     // adds averages / totals to the bottom
     // and styles it appropriately
-    // this part uses Sheets formulas because
-    // I felt it would have been messier
-    // to do it myself
     let row = groupRows.length+1;
     let toWrite = [['Averages'],['Totals']];
 
@@ -180,11 +168,8 @@ function populateGroup(dict, timeInfo) {
   }
 
   function resizeColsRows() {
-    // like the name says...
     // it resizes columns and rows
-    // the values to the RIGHT of the functions
-    // ie. setColumnWidth(i, HERE)
-    // are changable, and that's the actual weight
+    // ie. setColumnWidth(i, width)
     // 1 = A, 2 = B, ... etc
     sheet.setColumnWidth(1, 143);
     let i;
@@ -235,9 +220,8 @@ function populateGroup(dict, timeInfo) {
     let toWrite = [];
 
     function countTimeDiffs(name) {
-      // counts the time diffs based on THRESHOLD value
-      // to make it so there's a different threshold (10 mins instead of 5, for example)
-      // just change THRESHOLD to whatever
+      // counts the time diffs based on THRESHOLD value (5 = 5 mins)
+      // can change THRESHOLD to whatever
       //               vvvv
       const THRESHOLD = 5;
       let rawData = timeInfo[name]['timeDiffs'];
@@ -287,8 +271,6 @@ function populateGroup(dict, timeInfo) {
   addStartEndTimes();
 
   function addAlternatingColors() {
-    // makes it look prettier by making every other row
-    // light gray
     let startRow = 2;
     let endRow = groupRows.length+1;
 
@@ -354,7 +336,6 @@ function populateIndividual(callerID, data) {
   function addTimeDiffs() {
     // adds the time diffs next to the 'call time' column
     // returns an array [ startTime, endTime ]
-    // so that the parent function can have it
 
     if(data.length == 1) {
       // if there is only one time, no use in time diffs
@@ -430,24 +411,18 @@ function populateIndividual(callerID, data) {
     weights = [];
 
     c = 2;
-    // if you want to change the color scheme
-    // just change the numbers 25, 0, 2
-    // right now, if it's bigger than 25, it gets red
-    // if it's less than 25 but bigger than 2, it gets orange
-    // if it's 0 it gets yellow
-    // the rest, no change
-    // you can freely edit those values
+    // can freely edit threshold values
     function loop(val, ind, arr) {
       let num = Number(String(val).split(" ")[0]);
-      // here vvvv
+      //  here vvvv
       if(num >= 25) {
         colors.push(['red']);
         weights.push(['bold']);
-      //       here vvvv
+      //        here vvvv
       } else if(num == 0) {
         colors.push(['yellow']);
         weights.push(['bold']);
-      //        here vvvv 
+      //    and here vvvv 
       } else if(num > 2) {
         colors.push(['orange']);
         weights.push(['bold']);
@@ -473,8 +448,7 @@ function populateIndividual(callerID, data) {
 }
 
 function getRangeVals() {
-  // helper function to help get the actual
-  // text data from a range of cells
+  // helper function to get data from sheet
   let ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getActiveSheet();
   let rangeData = sheet.getDataRange();
@@ -482,7 +456,7 @@ function getRangeVals() {
 }
 
 function compileRows() {
-  // creates a python-dictionary basically structured like so
+  // creates a python-dictionary structured like so
   // dict = {
   //  ${caller login}: [row, row, row],
   //  ${caller login}: [row, row, row],
@@ -892,37 +866,6 @@ function startCallerDetails() {
     .setChartType(Charts.ChartType.COLUMN)
     .setPosition(34,9,0,0);
 
-
-    // chartBuilder.addRange(sheet.getRange('J29'))
-    // .addRange(sheet.getRange('J30'))
-    // .addRange(sheet.getRange('J31'))
-    // .addRange(sheet.getRange('J32'))
-    // .addRange(sheet.getRange('J33'))
-    // .setChartType(Charts.ChartType.COLUMN)
-    // .setPosition(34,9,0,0);
-
-
-    // let test = chartBuilder.asColumnChart();
-    
-    // let vals = leftRange.getValues();
-
-    // let colors = [];
-    // vals.forEach(
-      // (val, ind, arr) => {
-        // if(val[0] > 0) {
-          // colors.push(['green']);
-        // } else {
-          // colors.push(['red']);
-        // }
-      // }
-    // )
-
-    // Browser.msgBox(colors);
-    
-    // test.setColors(colors);
-
-
-
     sheet.insertChart(chartBuilder.build());
   }
 
@@ -941,7 +884,6 @@ function startCallerDetails() {
           name,
           Number(dict[name]['inWrap']),
           Number(dict[name]['inNotReady']),
-          // Number(dict[name]['inWrap'])+Number(dict[name]['inNotReady']),
         ];
         data.push(row);
       }
@@ -955,10 +897,7 @@ function startCallerDetails() {
     }
     
     let data = compileData();
-    // data.unshift(['Name','Wrap Up','Not Ready','Total']);
     data.unshift(['Name','Wrap Up','Not Ready']);
-
-    // let range = sheet.getRange(`A1:D${data.length}`);
     let range = sheet.getRange(`A1:C${data.length}`);
     range.setValues(data);
     range.setHorizontalAlignment('center');
@@ -976,10 +915,6 @@ function startCallerDetails() {
     let colChart = chart.asBarChart().setStacked();
     
     sheet.insertChart(colChart.build());
-
-
-
-
   }
 
   createTimeDiffs();
