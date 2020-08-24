@@ -22,7 +22,37 @@ function justToSaveStuff() {
   Browser.msgBox('test');
 }
 
+function checkCallResults() {
+  let ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getActiveSheet();
+
+  let cell = sheet.getRange('A1').getValue();
+  if(cell != "Voter ID") {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function checkCallerDetails() {
+  let ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getActiveSheet();
+
+  let cell = sheet.getRange('A1').getValue();
+  if(cell != "Date") {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 function startSheet() {
+  // check to make sure correct spreadsheet is loaded
+  if(checkCallResults()) {
+    Browser.msgBox('Incorrect CSV file loaded.');
+    return;
+  }
+
   // entry point into the script
   let dict = compileRows();
 
@@ -603,6 +633,12 @@ function startText() {
 
 function startCallerDetails() {
   
+  if(checkCallerDetails()) {
+    Browser.msgBox('Incorrect CSV file loaded.');
+    return;
+  }
+
+
   let rangeVals = getDataRange();
   let dict = createDict(rangeVals);
   
