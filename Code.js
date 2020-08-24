@@ -11,7 +11,7 @@ const COLORS = {
 function onOpen() {
   let ui = SpreadsheetApp.getUi();
   ui.createMenu('Scripts').addItem('Call results','startSheet')
-  .addItem('Callers Details', 'startCallerDetails')
+  .addItem('Callers details', 'startCallerDetails')
   .addToUi();
 }
 
