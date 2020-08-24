@@ -14,16 +14,14 @@ const COLORS = {
   'green':'#08bd0e',
 };
 
-function startText() {
-  Browser.msgBox('testing 123');
-}
-
 function onOpen() {
   // this runs when the script is opened
   // it creates the Scripts menu option
   // for the user to run the script
   let ui = SpreadsheetApp.getUi();
-  ui.createMenu('Scripts').addItem('ThruTalk Visuals','startSheet').addItem('ThruText Visuals', 'startText').addToUi();
+  ui.createMenu('Scripts').addItem('Call results','startSheet')
+  .addItem('Callers Details', 'startCallerDetails')
+  .addToUi();
 }
 
 function justToSaveStuff() {
@@ -525,3 +523,410 @@ function compileRows() {
   dict = sortDictByTime(dict);
   return dict;
 }
+
+function determineMessage(message) {
+  // takes in a message and figures out if
+  // A) it has the word "wrong" or "equivocado" in it
+  // B) it has the word "stop" in it
+  // C) there was a call back
+
+  let wrong, stop, call;
+
+  message = message.toLowerCase();
+  if(message.indexOf('wrong') == -1 || message.indexOf('equivocado') == -1) {
+    wrong = false;
+  } else {
+    wrong = true;
+  }
+
+  if(message.indexOf('stop') == -1) {
+    stop = false;
+  } else {
+    stop = true;
+  }
+
+  if(message.indexOf('tried to call you.') == -1) {
+    call = false;
+  } else {
+    call = true;
+  }
+
+  return [wrong, stop, call];
+}
+
+function startText() {
+  
+  function getDataRange() {
+    let ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getActiveSheet();
+    let range = sheet.getDataRange();
+    return range.getValues();
+  }
+  
+  function organizeIntoObject(rawData) {
+    
+    let dict = {};
+    
+    function addNames(val, ind, arr) {
+      let canvName = `${val[4]} ${val[5]}`;
+      if(canvName == "sender_first_name sender_last_name" || canvName == "") {
+        return;
+      } else {
+        dict[canvName] = {
+          'total':0,
+          'wrong#':0,
+          'stop':0,
+          'tried to call':0,
+        };
+      }
+    }
+    rawData.forEach(addNames);
+
+    let i;
+    let current = null;
+    for(i=1; i<rawData.length; i++) {
+      let status = rawData[i][2];
+      let message = rawData[i][3];
+      let canvName = `${rawData[i][4]} ${rawData[i][5]}`;
+
+      if(status == "outgoing") {
+        if(current == null) {
+
+        } else {
+          dict[canvName]['total']++;
+          let result = determineMessage(current['message']);
+          if(result[0]) {
+            dict[canvName]['wrong#']++;
+          }
+          if(result[1]) {
+            dict[canvName]['stop']++;
+          }
+          if(result[2]) {
+            dict[canvName]['tried to call']++;
+          }
+        }
+        current = {
+          'name':canvName,
+          'message':message,
+        };
+      } else {
+        current['message'] += message;
+      }
+    }
+
+    for (const name in dict) {
+      let str1 = ` | total: ${dict[name]['total']} `;
+      let str2 = `wrong: ${dict[name]['wrong#']} `;
+      let str3 = `stop: ${dict[name]['stop']} `;
+      let str4 = `tried to call: ${dict[name]['tried to call']}`;
+      Browser.msgBox(name+str1+str2+str3+str4);
+    }    
+  }
+  
+  let rawData = getDataRange();
+  let processedData = organizeIntoObject(rawData);
+}
+
+function startCallerDetails() {
+  
+  let rangeVals = getDataRange();
+  let dict = createDict(rangeVals);
+  
+  setupSheet();
+  
+  function getDataRange() {
+    let ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getActiveSheet();
+    let range = sheet.getDataRange();
+    return range.getValues();
+  }
+  
+  function createDict(rawData) {
+    let dict = {};
+    function addNames(val, ind, arr) {
+      if(ind == 0) {
+        return;
+      }
+      dict[val[2]] = {
+        'login':val[1],
+        'email':val[3],
+        'inCall':val[5],
+        'inWrap':val[6],
+        'inReady':val[7],
+        'inNotReady':val[8],
+        'totalCalls':val[9],
+      };
+    }
+    rawData.forEach(addNames);
+    return dict;
+  }
+    
+  function setupSheet() {
+    let ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss.renameActiveSheet('Raw Data');
+    ss.insertSheet("Formatted");
+    let sheet = SpreadsheetApp.getActive().getSheetByName('Formatted');
+    sheet.setHiddenGridlines(true);
+    
+    let topRow = ['Login','Name','Email','Wrap Up','Not Ready','Call','Ready','Total'];
+    
+    let topRange = sheet.getRange('A1:H1');
+    topRange.setValues([topRow]);
+    topRange.setFontWeight('bold');
+    topRange.setFontSize(11);
+    topRange.setBackground(COLORS['darkGray']);
+    topRange.setHorizontalAlignment('center');
+
+    }
+    
+
+
+
+  function createToWriteArr() {
+    let toWrite = [];
+    for (const name in dict) {
+      
+      let row = [
+        dict[name]['login'],
+        name,
+        dict[name]['email'],
+        dict[name]['inWrap'],
+        dict[name]['inNotReady'],
+        dict[name]['inCall'],
+        dict[name]['inReady'],
+        dict[name]['totalCalls'],
+      ];
+
+      toWrite.push(row);
+    }
+    return toWrite;
+  }
+
+  let unsortedData = createToWriteArr();
+
+  let sortedData = unsortedData.sort(function(a,b) {
+    let nA = a[1].toLowerCase().charCodeAt();
+    let nB = b[1].toLowerCase().charCodeAt();
+    return nA - nB;
+  });
+
+  function createColorArr(width, height) {
+    let arr = [];
+    for(let i=0; i<height; i++) {
+      let row = [];
+      for(let j=0; j<width; j++) {
+        if(i%2 == 0) {
+          row.push('white');
+        } else {
+          row.push(COLORS['gray']);
+        }
+      }
+      arr.push(row);
+    }
+    return arr;
+  }
+
+  function writeToSheet(sData) {
+    let sheet = SpreadsheetApp.getActive().getSheetByName('Formatted');
+    let eRow = 1 + sData.length;
+    let range = sheet.getRange(`A2:H${eRow}`);
+    range.setValues(sData);
+
+    let colors = createColorArr(8, sData.length);
+    range.setBackgrounds(colors);
+
+    sheet.setColumnWidth(1,108);
+    sheet.setColumnWidth(2,177);
+    sheet.setColumnWidth(3,177);
+    sheet.setColumnWidth(4,74);
+    sheet.setColumnWidth(5,74);
+    sheet.setColumnWidth(6,74);
+    sheet.setColumnWidth(7,74);
+    sheet.setColumnWidth(8,74);
+    sheet.setColumnWidth(10,200);
+    sheet.setColumnWidth(11,70);
+    sheet.setColumnWidth(12,70);
+    sheet.setColumnWidth(14,200);
+
+    let avgRowRange = sheet.getRange(`A${eRow+1}:H${eRow+1}`);
+    let avgRow = [
+      '',
+      '',
+      'AVERAGE',
+      `=AVERAGE(D2:D${eRow})`,
+      `=AVERAGE(E2:E${eRow})`,
+      `=AVERAGE(F2:F${eRow})`,
+      `=AVERAGE(G2:G${eRow})`,
+      `=AVERAGE(H2:H${eRow})`,
+    ];
+    avgRowRange.setValues([avgRow]);
+    avgRowRange.setFontSize(11);
+    avgRowRange.setFontWeight('bold');
+    avgRowRange.setBackground(COLORS['darkGray']);
+    avgRowRange.setHorizontalAlignment('right');
+    avgRowRange.setNumberFormat('###.#');
+
+    sheet.getRange(`B${eRow+1}:C${eRow+1}`).merge();
+
+    sheet.getRange('K3:L3').merge();
+    sheet.getRange('K4:L4').merge();
+    sheet.getRange('K5:L5').merge();
+    sheet.getRange('K6:L6').merge();
+    sheet.getRange('K7:L7').merge();
+    sheet.getRange('K3').setValue('Minutes in Wrap Up');
+    sheet.getRange('K3').setHorizontalAlignment('center');
+    sheet.getRange('K4').setValue('Minutes in Not Ready');
+    sheet.getRange('K4').setHorizontalAlignment('center');
+    sheet.getRange('K5').setValue('Minutes in Call');
+    sheet.getRange('K5').setHorizontalAlignment('center');
+    sheet.getRange('K6').setValue('Minutes in Ready');
+    sheet.getRange('K6').setHorizontalAlignment('center');
+    sheet.getRange('K7').setValue('Total Calls');
+    sheet.getRange('K7').setHorizontalAlignment('center');
+
+    let leftCol = [
+      [`=VLOOKUP($J$2,$B$2:$H$${eRow+1},3,FALSE)`],
+      [`=VLOOKUP($J$2,$B$2:$H$${eRow+1},4,FALSE)`],
+      [`=VLOOKUP($J$2,$B$2:$H$${eRow+1},5,FALSE)`],
+      [`=VLOOKUP($J$2,$B$2:$H$${eRow+1},6,FALSE)`],
+      [`=VLOOKUP($J$2,$B$2:$H$${eRow+1},7,FALSE)`],
+    ];
+    
+    let rightCol = [
+      [`=VLOOKUP($M$2,$B$2:$H$${eRow+1},3,FALSE)`],
+      [`=VLOOKUP($M$2,$B$2:$H$${eRow+1},4,FALSE)`],
+      [`=VLOOKUP($M$2,$B$2:$H$${eRow+1},5,FALSE)`],
+      [`=VLOOKUP($M$2,$B$2:$H$${eRow+1},6,FALSE)`],
+      [`=VLOOKUP($M$2,$B$2:$H$${eRow+1},7,FALSE)`],
+    ];
+
+    let leftRange = sheet.getRange(`J3:J7`);
+    leftRange.setValues(leftCol);
+
+    let rightRange = sheet.getRange('M3:M7');
+    rightRange.setValues(rightCol);
+    rightRange.setHorizontalAlignment('left');
+
+    let names = sheet.getRange(`B2:B${eRow+1}`);
+    let rule = SpreadsheetApp.newDataValidation().requireValueInRange(names).build();
+
+    let leftCell = sheet.getRange('J2');
+    leftCell.setDataValidation(rule);
+    leftCell.setValue(sheet.getRange('B2').getValue());
+    leftCell.setFontWeight('bold');
+    let rightCell = sheet.getRange('M2');
+    rightCell.setDataValidation(rule);
+    rightCell.setValue('AVERAGE');
+    rightCell.setFontWeight('bold');
+  }
+
+  writeToSheet(sortedData);
+
+  function createFirstChart() {
+    let sheet = SpreadsheetApp.getActive().getSheetByName('Formatted');
+    let chartBuilder = sheet.newChart();
+    let leftRange = sheet.getRange('J2:M7');
+    let rightRange = sheet.getRange('M2:M7');
+    chartBuilder.addRange(leftRange)
+    .setChartType(Charts.ChartType.BAR)
+    .setPosition(8,9,0,0);
+    // chartBuilder.addRange(rightRange);
+
+    sheet.insertChart(chartBuilder.build());
+  }
+
+  function writeSecondPart() {
+    let sheet = SpreadsheetApp.getActive().getSheetByName('Formatted');
+
+    let cell = sheet.getRange('J28');
+    cell.setValue('=J2&" vs "&M2');
+    cell.setFontWeight('bold');
+
+    let toWrite = [
+      [
+        '=J3-M3',
+        '=IF(J29<0, "less than", "more than")',
+        '=M2',
+        'Minutes in Wrap Up',
+      ],
+      [
+        '=J4-M4',
+        '=IF(J30<0, "less than", "more than")',
+        '=M2',
+        'Minutes in Not Ready',
+      ],
+      [
+        '=J5-M5',
+        '=IF(J31<0, "less than", "more than")',
+        '=M2',
+        'Minutes in Call',
+      ],
+      [
+        '=J6-M6',
+        '=IF(J32<0, "less than", "more than")',
+        '=M2',
+        'Minutes in Ready',
+      ],
+      [
+        '=J7-M7',
+        '=IF(J32<0, "less than", "more than")',
+        '=M2',
+        'Total Calls',
+      ]
+    ];
+
+    let range = sheet.getRange('J29:M33');
+    range.setValues(toWrite);
+
+
+  }
+
+  createFirstChart();
+  writeSecondPart();
+
+  function createSecondChart() {
+    let sheet = SpreadsheetApp.getActive().getSheetByName('Formatted');
+    let chartBuilder = sheet.newChart();
+    let leftRange = sheet.getRange('J29:J33');
+    // chartBuilder.addRange(leftRange)
+    // .setChartType(Charts.ChartType.COLUMN)
+    // .setPosition(34,9,0,0);
+
+
+    chartBuilder.addRange(sheet.getRange('J29'))
+    .addRange(sheet.getRange('J30'))
+    .addRange(sheet.getRange('J31'))
+    .addRange(sheet.getRange('J32'))
+    .addRange(sheet.getRange('J33'))
+    .setChartType(Charts.ChartType.COLUMN)
+    .setPosition(34,9,0,0);
+
+
+    let test = chartBuilder.asColumnChart();
+    
+    let vals = leftRange.getValues();
+
+    let colors = [];
+    vals.forEach(
+      (val, ind, arr) => {
+        Browser.msgBox(`val: ${val} type: ${typeof(val)}`);
+        Browser.msgBox(`val[0]: ${val[0]} type: ${typeof(val[0])}`);
+        if(val > 0) {
+          colors.push(['green']);
+        } else {
+          colors.push(['red']);
+        }
+      }
+    )
+    
+    test.setColors(colors);
+
+
+
+    sheet.insertChart(test.build());
+  }
+
+  createSecondChart();
+
+}
+
