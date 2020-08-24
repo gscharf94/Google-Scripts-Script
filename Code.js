@@ -888,45 +888,101 @@ function startCallerDetails() {
     let sheet = SpreadsheetApp.getActive().getSheetByName('Formatted');
     let chartBuilder = sheet.newChart();
     let leftRange = sheet.getRange('J29:J33');
-    // chartBuilder.addRange(leftRange)
-    // .setChartType(Charts.ChartType.COLUMN)
-    // .setPosition(34,9,0,0);
-
-
-    chartBuilder.addRange(sheet.getRange('J29'))
-    .addRange(sheet.getRange('J30'))
-    .addRange(sheet.getRange('J31'))
-    .addRange(sheet.getRange('J32'))
-    .addRange(sheet.getRange('J33'))
+    chartBuilder.addRange(leftRange)
     .setChartType(Charts.ChartType.COLUMN)
     .setPosition(34,9,0,0);
 
 
-    let test = chartBuilder.asColumnChart();
+    // chartBuilder.addRange(sheet.getRange('J29'))
+    // .addRange(sheet.getRange('J30'))
+    // .addRange(sheet.getRange('J31'))
+    // .addRange(sheet.getRange('J32'))
+    // .addRange(sheet.getRange('J33'))
+    // .setChartType(Charts.ChartType.COLUMN)
+    // .setPosition(34,9,0,0);
+
+
+    // let test = chartBuilder.asColumnChart();
     
-    let vals = leftRange.getValues();
+    // let vals = leftRange.getValues();
 
-    let colors = [];
-    vals.forEach(
-      (val, ind, arr) => {
-        Browser.msgBox(`val: ${val} type: ${typeof(val)}`);
-        Browser.msgBox(`val[0]: ${val[0]} type: ${typeof(val[0])}`);
-        if(val > 0) {
-          colors.push(['green']);
-        } else {
-          colors.push(['red']);
-        }
-      }
-    )
+    // let colors = [];
+    // vals.forEach(
+      // (val, ind, arr) => {
+        // if(val[0] > 0) {
+          // colors.push(['green']);
+        // } else {
+          // colors.push(['red']);
+        // }
+      // }
+    // )
+
+    // Browser.msgBox(colors);
     
-    test.setColors(colors);
+    // test.setColors(colors);
 
 
 
-    sheet.insertChart(test.build());
+    sheet.insertChart(chartBuilder.build());
   }
 
   createSecondChart();
+
+  function createTimeDiffs() {
+    let ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss.insertSheet("Time Flags");
+    let sheet = SpreadsheetApp.getActive().getSheetByName('Time Flags');
+    sheet.setHiddenGridlines(true);
+
+    function compileData() {
+      let data = [];
+      for (const name in dict) {
+        let row = [
+          name,
+          Number(dict[name]['inWrap']),
+          Number(dict[name]['inNotReady']),
+          // Number(dict[name]['inWrap'])+Number(dict[name]['inNotReady']),
+        ];
+        data.push(row);
+      }
+
+      let sortedData = data.sort((a,b) =>
+        
+        a[0][0].toLowerCase().charCodeAt() - b[0][0].toLowerCase().charCodeAt()
+      )
+
+      return sortedData;
+    }
+    
+    let data = compileData();
+    // data.unshift(['Name','Wrap Up','Not Ready','Total']);
+    data.unshift(['Name','Wrap Up','Not Ready']);
+
+    // let range = sheet.getRange(`A1:D${data.length}`);
+    let range = sheet.getRange(`A1:C${data.length}`);
+    range.setValues(data);
+    range.setHorizontalAlignment('center');
+    range.setFontWeight('bold');
+
+    let chart = sheet.newChart();
+    chart.addRange(range)
+      .setChartType(Charts.ChartType.BAR)
+      .setOption('width',1000)
+      .setOption('height',1000)
+      .setOption('legend',{ position: "none" })
+      .setOption('titlePosition','none')
+      .setPosition(1,4,0,0);
+
+    let colChart = chart.asBarChart().setStacked();
+    
+    sheet.insertChart(colChart.build());
+
+
+
+
+  }
+
+  createTimeDiffs();
 
 }
 
